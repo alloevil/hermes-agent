@@ -146,13 +146,24 @@ def auto_title_session(
     try:
         session_db.set_session_title(session_id, title)
         logger.debug("Auto-generated session title: %s", title)
-        if title_callback is not None:
-            try:
-                title_callback(title)
-            except Exception:
-                logger.debug("Auto-title callback failed", exc_info=True)
+    except ValueError:
+        # Title collision — generate a unique variant and retry
+        try:
+            title = session_db.get_next_title_in_lineage(title)
+            session_db.set_session_title(session_id, title)
+            logger.debug("Auto-generated session title (deduplicated): %s", title)
+        except Exception as e:
+            logger.debug("Failed to set auto-generated title after dedup: %s", e)
+            return
     except Exception as e:
         logger.debug("Failed to set auto-generated title: %s", e)
+        return
+
+    if title_callback is not None:
+        try:
+            title_callback(title)
+        except Exception:
+            logger.debug("Auto-title callback failed", exc_info=True)
 
 
 def maybe_auto_title(
